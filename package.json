@@ -1,0 +1,23 @@
+{
+  "name": "amber-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/app.js"
+  },
+  "type": "module",
+  "author": "kent",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.1.4",
+    "secretjs": "^1.9.3",
+    "telegraf": "^4.12.2"
+  },
+  "devDependencies": {
+    "@tsconfig/node18": "^2.0.1",
+    "@types/node": "^20.3.1",
+    "typescript": "^5.1.3"
+  }
+}
