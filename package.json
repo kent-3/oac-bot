@@ -5,7 +5,8 @@
   "main": "dist/app.js",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/app.js"
+    "start": "tsc && node dist/app.js",
+    "bot": "tsc && node dist/app.js >> bot.log 2>&1 &"
   },
   "type": "module",
   "author": "kent",
