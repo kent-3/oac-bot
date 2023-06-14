@@ -1,5 +1,5 @@
 import { SecretNetworkClient } from "secretjs";
-import { Telegraf } from "telegraf";
+import { Markup, Telegraf } from "telegraf";
 import "dotenv/config";
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
@@ -14,11 +14,24 @@ const secretjs = new SecretNetworkClient({
 
 const bot = new Telegraf(BOT_TOKEN);
 
+const keyboard = Markup.keyboard([
+  [
+    Markup.button.webApp("amberdao.io", "https://www.amberdao.io/"),
+    Markup.button.webApp(
+      "App Preview",
+      "https://kent-3.github.io/amber-app"
+    ),
+  ],
+]).resize();
+
 bot.start((ctx) => {
-  ctx.replyWithMarkdownV2(`Enter your Secret address and viewing key to generate an invite link to OAC\\.
+  ctx.replyWithMarkdownV2(
+    `Enter your Secret address and viewing key to generate an invite link to OAC\\.
 
 Example:
-\`/join secret1hctvs6s48yu7pr2n3ujn3wn74fr5d798daqwwg amber_rocks\``);
+\`/join secret1hctvs6s48yu7pr2n3ujn3wn74fr5d798daqwwg amber_rocks\``,
+    keyboard
+  );
 });
 
 bot.command("join", async (ctx) => {
@@ -74,5 +87,11 @@ bot.launch();
 
 console.log("Bot is running...");
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+process.once("SIGINT", () => {
+  console.log("Bot is interupted...");
+  bot.stop("SIGINT");
+});
+process.once("SIGTERM", () => {
+  console.log("Bot is shutting down...");
+  bot.stop("SIGTERM");
+});
