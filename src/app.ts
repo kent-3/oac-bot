@@ -34,6 +34,14 @@ Example:
   );
 });
 
+bot.telegram.setMyCommands([
+  { command: "start", description: "Be greeted by the bot" },
+  {
+    command: "join",
+    description: "Request an invitation",
+  },
+]);
+
 bot.command("join", async (ctx) => {
   const text = ctx.message.text;
   const [command, address, viewingKey] = text.split(" ");

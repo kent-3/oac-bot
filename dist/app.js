@@ -22,6 +22,13 @@ bot.start((ctx) => {
 Example:
 \`/join secret1hctvs6s48yu7pr2n3ujn3wn74fr5d798daqwwg amber_rocks\``, keyboard);
 });
+bot.telegram.setMyCommands([
+    { command: "start", description: "Be greeted by the bot" },
+    {
+        command: "join",
+        description: "Request an invitation",
+    },
+]);
 bot.command("join", async (ctx) => {
     const text = ctx.message.text;
     const [command, address, viewingKey] = text.split(" ");
