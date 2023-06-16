@@ -1,8 +1,51 @@
 import fetch from 'node-fetch';
+import { randomInt } from 'crypto';
+import { createCanvas, registerFont } from 'canvas';
 import { SecretNetworkClient } from 'secretjs';
 import { Markup, Telegraf } from 'telegraf';
-import 'dotenv/config';
 import { InlineQueryResultArticle } from 'telegraf/typings/core/types/typegram';
+import 'dotenv/config';
+
+registerFont('./fonts/OpenSans-Regular.ttf', { family: 'Open Sans' })
+
+const drawColoredCube = (percentage: number, height: string, gas: string): Buffer => {
+	// First, we'll map the percentage to a color.
+	// Here, we'll use a simple gradient from red (0%) to green (100%).
+	// const r = Math.floor(255 * ((100 - percentage) / 100));
+	// const g = Math.floor(255 * (percentage / 100));
+	const a = 0.3 + (0.7 * percentage) / 100;
+
+	const canvas = createCanvas(200, 200);
+	const ctx = canvas.getContext('2d');
+
+	// Set entire canvas
+	// ctx.fillStyle = `rgb(75, 77, 78)`;
+	// ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+	// Write your data on the canvas
+	ctx.fillStyle = `rgb(0, 0, 0)`;
+	ctx.font = '18px "Open Sans"';
+	ctx.fillText(`gas used: ${gas}`, 15, 180);
+	ctx.fillText(`block: ${height}`, 30, 30);
+
+	// Draw a square to represent the cube
+	ctx.strokeStyle = 'black';
+	ctx.lineWidth = 2;
+	ctx.strokeRect(50, 50, 100, 100);
+
+	// Calculate the height of the filled area
+	const fillHeight = 98 * (percentage / 100);
+	const startY = 149 - fillHeight; // We start from the bottom of the square
+
+	// Fill the square with the color
+	// ctx.fillStyle = `rgb(${r}, ${g}, 10)`;
+	ctx.fillStyle = `rgba(242, 176, 70, ${a})`;
+	ctx.fillRect(51, startY, 98, fillHeight);
+
+	// ctx.fillRect(51, 51, 99, 99); // Fill the inside of the square completely
+
+	return canvas.toBuffer();
+};
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const PRIVATE_CHAT_ID = process.env.PRIVATE_CHAT_ID!;
@@ -53,8 +96,6 @@ function search(data: TokenInfo[], name: string): TokenInfo[] | undefined {
 	return data.filter(
 		(item) => item.name.toLowerCase().trim().includes(lowerCaseName) && !item.name.endsWith('LP')
 	);
-	// const foundObject = data.find((item) => item.name === name);
-	// return foundObject ? foundObject.value : undefined;
 }
 
 function format(str: string | undefined): string | null {
@@ -63,7 +104,7 @@ function format(str: string | undefined): string | null {
 	}
 
 	const num = parseFloat(str);
-	return `${num.toFixed(2)} USD`;
+	return `${num.toFixed(3)} USD`;
 }
 
 const bot = new Telegraf(BOT_TOKEN);
@@ -77,7 +118,7 @@ const keyboard = Markup.keyboard([
 
 bot.start((ctx) => {
 	ctx.replyWithMarkdownV2(
-		`Enter your Secret address and viewing key to generate an invite link to OAC\\.
+		`Enter your SCRT address and AMBER viewing key to generate an invite link to OAC\\.
 
 Example:
 \`/join secret1hctvs6s48yu7pr2n3ujn3wn74fr5d798daqwwg amber_rocks\``,
@@ -93,6 +134,10 @@ bot.telegram.setMyCommands([
 	},
 	// { command: 'p', description: 'Get price of a token' },
 	{ command: 'ratio', description: 'Get ratio of SHD/SCRT' },
+	{ command: 'stake', description: 'Get SCRT staked to AmberDAO' },
+	{ command: 'delegators', description: 'Get number of delegators to AmberDAO' },
+	{ command: 'top5whale', description: 'Get top 5 largest delegations to AmberDAO' },
+	{ command: 'fact', description: 'Get a random fact about amber' },
 ]);
 
 bot.on('inline_query', async (ctx) => {
@@ -189,17 +234,22 @@ bot.command('ratio', async (ctx) => {
 	const ratio1 = (parseFloat(SHD!.value) / parseFloat(SCRT!.value)).toFixed(2);
 	const ratio2 = (parseFloat(SHD!.value) / parseFloat(stkdSCRT!.value)).toFixed(2);
 	ctx.reply(`1 SHD = ${ratio1} SCRT\n1 SHD = ${ratio2} stkd-SCRT`);
-	// ctx.reply(`1 SHD = ${ratio2} stkd-SCRT`);
 });
 
 bot.command('join', async (ctx) => {
+	if (ctx.chat.id < 0) {
+		// bot doesn't have permission to delete messages yet
+		// if (ctx.chat.id == -1001742085729) {
+		// 	ctx.deleteMessage(ctx.message.message_id);
+		// }
+		return ctx.reply('DM me');
+	}
+
 	const text = ctx.message.text;
 	const [command, address, viewingKey] = text.split(' ');
 
 	if (!address || !viewingKey) {
-		return ctx.reply(
-			'Please provide a address and viewingKey. Usage: /join <address> <viewingKey>'
-		);
+		return ctx.reply('Please provide an address and viewing key. Usage: /join <address> <key>');
 	}
 
 	let amount = '0';
@@ -236,6 +286,82 @@ bot.command('join', async (ctx) => {
 			console.log('Error generating invite link:', error);
 		}
 	}
+});
+
+bot.command('stake', async (ctx) => {
+	const { validator: response } = await secretjs.query.staking.validator({
+		validator_addr: 'secretvaloper18w7rm926ue3nmy8ay58e3lc2nqnttrlhhgpch6',
+	});
+	let scrt = Math.round(parseInt(response!.tokens!) / 1000000);
+	ctx.reply(`AmberDAO has ${scrt.toLocaleString()} SCRT staked.`);
+});
+bot.command('delegators', async (ctx) => {
+	const response = await secretjs.query.staking.validatorDelegations({
+		validator_addr: 'secretvaloper18w7rm926ue3nmy8ay58e3lc2nqnttrlhhgpch6',
+		pagination: { count_total: true },
+	});
+	let total: number = parseFloat(response.pagination!.total!);
+	ctx.reply(`AmberDAO has ${total} delegations.`);
+});
+bot.command('top5whale', async (ctx) => {
+	const { delegation_responses: response } = await secretjs.query.staking.validatorDelegations({
+		validator_addr: 'secretvaloper18w7rm926ue3nmy8ay58e3lc2nqnttrlhhgpch6',
+		pagination: { limit: '1000000' },
+	});
+	let amounts: number[] = [];
+	for (let i = 0; i < response!.length; i++) {
+		amounts.push(parseInt(response![i].balance?.amount!));
+	}
+	amounts.sort((a, b) => a - b).reverse();
+	let top_five: string[] = [];
+	for (let i = 0; i < 5; i++) {
+		const element = Math.round(amounts[i] / 1000000);
+		top_five.push(element.toLocaleString() + ' SCRT');
+	}
+	ctx.reply(`The top 5 largest delegations to AmberDAO are:\n${top_five.join(' \n')}`);
+});
+bot.command('fact', (ctx) => {
+	let fact: string;
+	let facts: string[] = [
+		'Amber is a gem - but not a gemstone.',
+		'The largest amber deposits in the world are in the Baltic region.',
+		"Amber was once part of a tree's immune system",
+		'Amber requires millions of years and proper burial conditions to form.',
+		'The word electricity derives from the greek word for amber.',
+		'Multiple extinct species have been identified thanks to amber.',
+		'Amber has healing powers and the power to ward off witches.',
+		'Humans have used amber in jewelry since at least 11,000 BCE.',
+		'The oldest amber is 320 million years old.',
+		'Amber has been found in more than 300 colors.',
+		"It's easy to be fooled by fake amber.",
+	];
+	fact = facts[randomInt(11)];
+	ctx.reply(fact);
+});
+
+bot.command('block', async (ctx) => {
+
+	const r = await secretjs.query.tendermint.getLatestBlock({});
+	const blockHeight = r.block?.header?.height!;
+
+	let gas = 0;
+
+	try {
+		const resp = await secretjs.query.txsQuery(`tx.height = ${blockHeight}`);
+
+		resp.forEach((element) => {
+			gas += element.gasUsed;
+		});
+	} catch (error) {
+		throw new Error(`Error:\n ${JSON.stringify(error, null, 4)}`);
+	}
+
+	const imageBuffer = drawColoredCube(
+		100 * gas / 6000000,
+		parseInt(blockHeight!).toLocaleString(),
+		gas.toLocaleString()
+	);
+	ctx.replyWithPhoto({ source: imageBuffer });
 });
 
 bot.launch();
