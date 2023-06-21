@@ -5,8 +5,17 @@ import { SecretNetworkClient } from 'secretjs';
 import { Markup, Telegraf } from 'telegraf';
 import { InlineQueryResultArticle } from 'telegraf/typings/core/types/typegram';
 import 'dotenv/config';
+import { getTotalUnbonding } from './unbonding.js';
+import { createChart } from './charting.js';
+import fs from 'fs';
+import { promisify } from 'util';
+import path from 'path';
 
-registerFont('./fonts/OpenSans-Regular.ttf', { family: 'Open Sans' })
+// Convert fs functions to promises
+const stat = promisify(fs.stat);
+const exists = promisify(fs.exists);
+
+registerFont('./fonts/OpenSans-Regular.ttf', { family: 'Open Sans' });
 
 const drawColoredCube = (percentage: number, height: string, gas: string): Buffer => {
 	// First, we'll map the percentage to a color.
@@ -340,7 +349,6 @@ bot.command('fact', (ctx) => {
 });
 
 bot.command('block', async (ctx) => {
-
 	const r = await secretjs.query.tendermint.getLatestBlock({});
 	const blockHeight = r.block?.header?.height!;
 
@@ -357,10 +365,42 @@ bot.command('block', async (ctx) => {
 	}
 
 	const imageBuffer = drawColoredCube(
-		100 * gas / 6000000,
+		(100 * gas) / 6000000,
 		parseInt(blockHeight!).toLocaleString(),
 		gas.toLocaleString()
 	);
+	ctx.replyWithPhoto({ source: imageBuffer });
+});
+
+bot.command('unbonding', async (ctx) => {
+	const filePath = 'unbonding.json';
+	const fileExists = await exists(filePath);
+	let shouldUpdateFile = true;
+
+	if (fileExists) {
+		const stats = await stat(filePath);
+		const creationTime = new Date(stats.mtime);
+		const currentTime = new Date();
+
+		// Difference in milliseconds
+		const difference = currentTime.getTime() - creationTime.getTime();
+
+		// If the difference is less than 12 hours, we don't need to update the file
+		if (difference < 12 * 60 * 60 * 1000) {
+			shouldUpdateFile = false;
+		}
+	}
+  let loadingMessage;
+
+  if (shouldUpdateFile) {
+    loadingMessage = await ctx.reply('Processing your request. This might take a while...');
+    await getTotalUnbonding(); // I'm assuming this function updates 'unbonding.json'
+  }
+
+  const imageBuffer = await createChart('unbonding.json');
+  if (loadingMessage) {
+    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id);
+  }
 	ctx.replyWithPhoto({ source: imageBuffer });
 });
 
