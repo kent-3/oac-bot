@@ -181,7 +181,23 @@ bot.on('inline_query', async (ctx) => {
 			},
 		};
 		results.push(result1, result2);
-	} else if (query != 'ratio' && assets) {
+	} else if (query == 'claimed') {
+		const query = (await secretjs.query.snip20.queryContract({
+			contract_address: 'secret1jxryqg50gxppm6rukju22hw3g2rar4det40935',
+			code_hash: '91d12f5ff61c4ada31499515ceb340695e3cc132b2d99f8fc5c9963b3fe5099e',
+			query: { total_claimed: {} },
+		})) as { total_claimed: { claimed: string } };
+		const shd = parseInt(query.total_claimed.claimed) / 100000000000;
+		const result: InlineQueryResultArticle = {
+			type: 'article',
+			id: '1',
+			title: `${shd}k SHD have been claimed.`,
+			input_message_content: {
+				message_text: `${shd}k SHD have been claimed.`,
+			},
+		};
+		results.push(result);
+	} else if (query !== 'ratio' && query !== 'claimed' && assets !== undefined) {
 		assets.sort((a, b) => a.name.localeCompare(b.name));
 		for (const [i, asset] of assets.entries()) {
 			const title = `${asset.name} = ${format(asset.value)}`;
@@ -372,37 +388,39 @@ bot.command('block', async (ctx) => {
 	ctx.replyWithPhoto({ source: imageBuffer });
 });
 
-bot.command('unbonding', async (ctx) => {
-	const filePath = 'unbonding.json';
-	const fileExists = await exists(filePath);
-	let shouldUpdateFile = true;
+// this command takes too long and times out :(
 
-	if (fileExists) {
-		const stats = await stat(filePath);
-		const creationTime = new Date(stats.mtime);
-		const currentTime = new Date();
+// bot.command('unbonding', async (ctx) => {
+// 	const filePath = 'unbonding.json';
+// 	const fileExists = await exists(filePath);
+// 	let shouldUpdateFile = true;
 
-		// Difference in milliseconds
-		const difference = currentTime.getTime() - creationTime.getTime();
+// 	if (fileExists) {
+// 		const stats = await stat(filePath);
+// 		const creationTime = new Date(stats.mtime);
+// 		const currentTime = new Date();
 
-		// If the difference is less than 12 hours, we don't need to update the file
-		if (difference < 12 * 60 * 60 * 1000) {
-			shouldUpdateFile = false;
-		}
-	}
-  let loadingMessage;
+// 		// Difference in milliseconds
+// 		const difference = currentTime.getTime() - creationTime.getTime();
 
-  if (shouldUpdateFile) {
-    loadingMessage = await ctx.reply('Processing your request. This might take a while...');
-    await getTotalUnbonding(); // I'm assuming this function updates 'unbonding.json'
-  }
+// 		// If the difference is less than 12 hours, we don't need to update the file
+// 		if (difference < 12 * 60 * 60 * 1000) {
+// 			shouldUpdateFile = false;
+// 		}
+// 	}
+//   let loadingMessage;
 
-  const imageBuffer = await createChart('unbonding.json');
-  if (loadingMessage) {
-    await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id);
-  }
-	ctx.replyWithPhoto({ source: imageBuffer });
-});
+//   if (shouldUpdateFile) {
+//     loadingMessage = await ctx.reply('Processing your request. This might take a while...');
+//     await getTotalUnbonding(); // I'm assuming this function updates 'unbonding.json'
+//   }
+
+//   const imageBuffer = await createChart('unbonding.json');
+//   if (loadingMessage) {
+//     await ctx.telegram.deleteMessage(ctx.chat.id, loadingMessage.message_id);
+//   }
+// 	ctx.replyWithPhoto({ source: imageBuffer });
+// });
 
 bot.launch();
 
