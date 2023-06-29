@@ -182,22 +182,62 @@ bot.on('inline_query', async (ctx) => {
 		};
 		results.push(result1, result2);
 	} else if (query == 'claimed') {
-		const query = (await secretjs.query.snip20.queryContract({
-			contract_address: 'secret1jxryqg50gxppm6rukju22hw3g2rar4det40935',
-			code_hash: '91d12f5ff61c4ada31499515ceb340695e3cc132b2d99f8fc5c9963b3fe5099e',
-			query: { total_claimed: {} },
-		})) as { total_claimed: { claimed: string } };
-		const shd = parseInt(query.total_claimed.claimed) / 100000000000;
-		const result: InlineQueryResultArticle = {
-			type: 'article',
-			id: '1',
-			title: `${shd}k SHD have been claimed.`,
-			input_message_content: {
-				message_text: `${shd}k SHD have been claimed.`,
-			},
-		};
-		results.push(result);
-	} else if (query !== 'ratio' && query !== 'claimed' && assets !== undefined) {
+		try {
+			const query = (await secretjs.query.snip20.queryContract({
+				contract_address: 'secret1jxryqg50gxppm6rukju22hw3g2rar4det40935',
+				code_hash: '91d12f5ff61c4ada31499515ceb340695e3cc132b2d99f8fc5c9963b3fe5099e',
+				query: { total_claimed: {} },
+			})) as { total_claimed: { claimed: string } };
+			const shd = parseInt(query.total_claimed.claimed) / 100000000000;
+			const result: InlineQueryResultArticle = {
+				type: 'article',
+				id: '1',
+				title: `${shd}k SHD have been claimed.`,
+				input_message_content: {
+					message_text: `${shd}k SHD have been claimed.`,
+				},
+			};
+			results.push(result);
+		} catch (error) {
+			console.log(`secretjs Error: ${error}`);
+		}
+	} else if (query == 'supply') {
+		try {
+			const response = (await secretjs.query.compute.queryContract({
+				query: {
+					token_info: {},
+				},
+				contract_address: 'secret153wu605vvp934xhd4k9dtd640zsep5jkesstdm',
+				code_hash: '638a3e1d50175fbcb8373cf801565283e3eb23d88a9b7b7f99fcc5eb1e6b561e',
+			})) as {
+				token_info: {
+					name: string;
+					symbol: string;
+					decimals: number;
+					total_supply: string;
+				};
+			};
+			const supply = (
+				Math.round(parseInt(response.token_info.total_supply) / 100000000 / 1000) * 1000
+			).toLocaleString();
+			const result: InlineQueryResultArticle = {
+				type: 'article',
+				id: '1',
+				title: `SHD circulating supply ≈ ${supply}`,
+				input_message_content: {
+					message_text: `SHD circulating supply ≈ ${supply}`,
+				},
+			};
+			results.push(result);
+		} catch (error) {
+			console.log(`secretjs Error: ${error}`);
+		}
+	} else if (
+		query !== 'ratio' &&
+		query !== 'claimed' &&
+		query !== 'supply' &&
+		assets !== undefined
+	) {
 		assets.sort((a, b) => a.name.localeCompare(b.name));
 		for (const [i, asset] of assets.entries()) {
 			const title = `${asset.name} = ${format(asset.value)}`;
