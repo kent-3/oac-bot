@@ -5,11 +5,11 @@ import { SecretNetworkClient } from 'secretjs';
 import { Markup, Telegraf } from 'telegraf';
 import { InlineQueryResultArticle } from 'telegraf/typings/core/types/typegram';
 import 'dotenv/config';
-import { getTotalUnbonding } from './unbonding.js';
-import { createChart } from './charting.js';
+// import { getTotalUnbonding } from './unbonding.js';
+// import { createChart } from './charting.js';
 import fs from 'fs';
 import { promisify } from 'util';
-import path from 'path';
+// import path from 'path';
 
 // Convert fs functions to promises
 const stat = promisify(fs.stat);
