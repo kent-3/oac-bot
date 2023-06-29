@@ -7,13 +7,13 @@ import { InlineQueryResultArticle } from 'telegraf/typings/core/types/typegram';
 import 'dotenv/config';
 // import { getTotalUnbonding } from './unbonding.js';
 // import { createChart } from './charting.js';
-import fs from 'fs';
-import { promisify } from 'util';
+// import fs from 'fs';
+// import { promisify } from 'util';
 // import path from 'path';
 
 // Convert fs functions to promises
-const stat = promisify(fs.stat);
-const exists = promisify(fs.exists);
+// const stat = promisify(fs.stat);
+// const exists = promisify(fs.exists);
 
 registerFont('./fonts/OpenSans-Regular.ttf', { family: 'Open Sans' });
 
