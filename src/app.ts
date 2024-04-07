@@ -141,14 +141,13 @@ bot.telegram.setMyCommands([
 		command: 'join',
 		description: 'Request an invitation',
 	},
-	// { command: 'p', description: 'Get price of a token' },
 	{ command: 'ratio', description: 'Get ratio of SHD/SCRT' },
 	{ command: 'stake', description: 'Get SCRT staked to AmberDAO' },
 	{ command: 'delegators', description: 'Get number of delegators to AmberDAO' },
 	{ command: 'top5whale', description: 'Get top 5 largest delegations to AmberDAO' },
 	{ command: 'fact', description: 'Get a random fact about amber' },
 ]);
-
+/*
 bot.on('inline_query', async (ctx) => {
 	const query = ctx.inlineQuery.query ?? '';
 	const results: InlineQueryResultArticle[] = [];
@@ -275,21 +274,7 @@ bot.on('inline_query', async (ctx) => {
 		cache_time: 300,
 	});
 });
-
-// bot.command('p', async (ctx) => {
-// 	const text = ctx.message.text;
-// 	const [command, query] = text.split(' ');
-
-// 	const data = await fetchAndCacheData();
-// 	const assets = search(data, query);
-
-// 	if (assets) {
-// 		const title = `${assets[0].name} = ${format(assets[0].value)}`;
-// 		ctx.reply(title);
-// 	} else {
-// 		ctx.reply(`${query} not found`);
-// 	}
-// });
+*/
 
 bot.command('ratio', async (ctx) => {
 	const data = await fetchAndCacheData();
@@ -314,7 +299,7 @@ bot.command('join', async (ctx) => {
 	const [command, address, viewingKey] = text.split(' ');
 
 	if (!address || !viewingKey) {
-		return ctx.reply('Please provide an address and viewing key. Usage: /join <address> <key>');
+		return ctx.reply('Please provide an address and viewing key. Like this: `/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 my_viewing_key`');
 	}
 
 	let amount = '0';
@@ -323,13 +308,14 @@ bot.command('join', async (ctx) => {
 		const response = await secretjs.query.snip20.getBalance({
 			contract: {
 				address: 'secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852',
-				code_hash: '5a085bd8ed89de92b35134ddd12505a602c7759ea25fb5c089ba03c8535b3042',
+				code_hash: '9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42',
 			},
 			address: address,
 			auth: {
 				key: viewingKey,
 			},
 		});
+		console.log(response)
 		amount = response.balance.amount;
 	} catch (error) {
 		return ctx.reply(
