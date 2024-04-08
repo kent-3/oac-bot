@@ -46,7 +46,7 @@ bot.start((ctx) => {
 		`Enter your SCRT address and AMBER viewing key to generate an invite link to OAC\\.
 
 Example:
-\`/join secret1hctvs6s48yu7pr2n3ujn3wn74fr5d798daqwwg amber_rocks\``,
+\`/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42\``,
 		keyboard
 	);
 });
