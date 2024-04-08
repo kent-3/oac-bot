@@ -1,13 +1,13 @@
 {
-	"extends": "@tsconfig/node18/tsconfig.json",
+  "extends": "@tsconfig/node18/tsconfig.json",
 
-	"compilerOptions": {
-		"module": "es2022",
-		"sourceMap": true,
-		"rootDir": "src",
-		"outDir": "dist"
-	},
+  "compilerOptions": {
+    "module": "es2022",
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
 
-	"include": ["src/**/*"],
-	"exclude": ["node_modules", "**/*.spec.ts", "src/charting.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.spec.ts", "src/charting.ts"]
 }
