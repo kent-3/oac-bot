@@ -2,6 +2,7 @@ import { randomInt } from 'crypto'
 import { SecretNetworkClient } from 'secretjs'
 import { Markup, Telegraf } from 'telegraf'
 import 'dotenv/config'
+import { initDb, addUser, getUsers } from './database.js'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
 const PRIVATE_CHAT_ID = process.env.PRIVATE_CHAT_ID
@@ -13,15 +14,14 @@ const secretjs = new SecretNetworkClient({
   chainId: CHAIN_ID,
 })
 
+const db = await initDb()
+
 const bot = new Telegraf(BOT_TOKEN)
 
 bot.telegram.setMyCommands([
   { command: 'start', description: 'Be greeted by the bot' },
-  {
-    command: 'join',
-    description: 'Request an invitation',
-  },
-  { command: 'ratio', description: 'Get ratio of SHD/SCRT' },
+  { command: 'join', description: 'Request an invitation' },
+  { command: 'code', description: 'Get your OAC code' },
   { command: 'stake', description: 'Get SCRT staked to AmberDAO' },
   {
     command: 'delegators',
@@ -51,7 +51,7 @@ Example:
   )
 })
 
-bot.command('get_code', async (ctx) => {
+bot.command('code', async (ctx) => {
   const text = ctx.message.text
   const [_command, address, viewingKey] = text.split(' ')
   let code
@@ -62,7 +62,7 @@ bot.command('get_code', async (ctx) => {
 
   if (!address || !viewingKey) {
     return ctx.reply(
-      'Please provide an address and viewing key. Like this: `/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42`'
+      'Please provide an address and viewing key. Like this: `/code secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42`'
     )
   }
 
@@ -93,12 +93,22 @@ bot.command('get_code', async (ctx) => {
   }
 })
 
+bot.command('insert_user', async (ctx) => {
+  const id = ctx.from.id
+  const username = ctx.from.username
+  const code = ctx.message.text.split(' ')[1]
+
+  await addUser(db, { id, username, code })
+
+  ctx.reply('OK')
+})
+
 bot.command('join', async (ctx) => {
   if (ctx.chat.id < 0) {
     return ctx.reply('DM me')
   }
   const text = ctx.message.text
-  const [command, address, viewingKey] = text.split(' ')
+  const [_command, address, viewingKey] = text.split(' ')
   if (!address || !viewingKey) {
     return ctx.reply(
       'Please provide an address and viewing key. Like this: `/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42`'
