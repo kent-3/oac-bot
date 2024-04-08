@@ -213,12 +213,20 @@ bot.launch()
 
 console.log('Bot is running...')
 
-process.once('SIGINT', () => {
+process.once('SIGINT', async () => {
   console.log('Bot is interupted...')
   bot.stop('SIGINT')
+  if (db) {
+    await db.close()
+    console.log('Database connection closed.')
+  }
 })
 
-process.once('SIGTERM', () => {
+process.once('SIGTERM', async () => {
   console.log('Bot is shutting down...')
   bot.stop('SIGTERM')
+  if (db) {
+    await db.close()
+    console.log('Database connection closed.')
+  }
 })
