@@ -51,6 +51,48 @@ Example:
   )
 })
 
+bot.command('get_code', async (ctx) => {
+  const text = ctx.message.text
+  const [_command, address, viewingKey] = text.split(' ')
+  let code
+
+  if (ctx.chat.id < 0) {
+    return ctx.reply('DM me')
+  }
+
+  if (!address || !viewingKey) {
+    return ctx.reply(
+      'Please provide an address and viewing key. Like this: `/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42`'
+    )
+  }
+
+  try {
+    const response = await secretjs.query.compute.queryContract({
+      contract_address: 'secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852',
+      code_hash:
+        '9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42',
+      query: {
+        member_code: {
+          address: address,
+          key: viewingKey,
+        },
+      },
+    })
+    console.log(response)
+    code = response.member_code.code
+  } catch (error) {
+    return ctx.reply(
+      "I couldn't check your balance 😢. Check your address and viewing key, and try again."
+    )
+  }
+
+  if (code === '') {
+    return ctx.reply('Not enough AMBER...')
+  } else {
+    return ctx.reply(`Your OAC membership code is: ${code}`)
+  }
+})
+
 bot.command('join', async (ctx) => {
   if (ctx.chat.id < 0) {
     return ctx.reply('DM me')
