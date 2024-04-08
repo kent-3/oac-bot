@@ -134,9 +134,9 @@ bot.command('join', async (ctx) => {
       "I couldn't check your balance 😢. Check your address and viewing key, and try again."
     )
   }
-  if (parseFloat(amount) < 1) {
+  if (parseInt(amount) < 1000000) {
     ctx.reply('Not enough AMBER...')
-  } else if (parseFloat(amount) >= 1) {
+  } else if (parseInt(amount) >= 1000000) {
     const userId = ctx.from.id
     try {
       const inviteLink = await ctx.telegram.exportChatInviteLink(
