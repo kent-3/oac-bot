@@ -193,7 +193,7 @@ bot.command('top5whale', async (ctx) => {
 bot.command('fact', (ctx) => {
   let fact
   let facts = [
-    'Amber is a gem - but not a gemstone.',
+    'Amber is a gem - but not a gemstone. OK technically it is an "organic gemstone".',
     'The largest amber deposits in the world are in the Baltic region.',
     "Amber was once part of a tree's immune system",
     'Amber requires millions of years and proper burial conditions to form.',
