@@ -36,7 +36,7 @@ bot.telegram.setMyCommands([
 
 const keyboard = Markup.keyboard([
   [
-    Markup.button.webApp('amberdao.io', 'https://www.amberdao.io/'),
+    Markup.button.webApp('amber.money', 'https://amber.money'),
     Markup.button.webApp('App Preview', 'https://kent-3.github.io/amber-app'),
   ],
 ]).resize()
