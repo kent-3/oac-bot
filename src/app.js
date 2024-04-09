@@ -6,6 +6,7 @@ import { initDb, addUser, getUsers } from './database.js'
 import {
   getAllMemberCodes,
   validateCodes,
+  sendInviteLink,
   findMembersToKick,
   rip,
 } from './utils.js'
@@ -52,6 +53,7 @@ bot.start((ctx) => {
 Example:
 \`/code secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42\`
 
+Then:
 \`/join xDgNdgvDiXnrh4O-QFHz3YwstYGCfxNuQ33AlJymlQg\``,
     keyboard
   )
@@ -84,7 +86,13 @@ bot.command('code', async (ctx) => {
       },
     })
     console.log(response)
-    const code = response.member_code.code
+    
+    const code = response.member_code?.code
+    const errorMessage = response.viewing_key_error?.msg
+
+    if (errorMessage) {
+      return ctx.reply(errorMessage)
+    }
 
     if (code === '') {
       return ctx.reply('Not enough AMBER...')
@@ -116,9 +124,9 @@ bot.command('join', async (ctx) => {
 
   try {
     const validCode = await validateCodes(secretjs, [code])
-    if (code === validCode) {
+    if (code === validCode[0]) {
       await addUser(db, { id, username, code })
-      await sendInviteLink(userId, PRIVATE_CHAT_ID)
+      await sendInviteLink(ctx, PRIVATE_CHAT_ID)
     } else {
       return ctx.reply('Invalid code...')
     }

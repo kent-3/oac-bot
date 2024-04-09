@@ -30,7 +30,7 @@ async function validateCodes(secretjs, codes) {
       '9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42',
     query: {
       valid_codes: {
-        codes,
+	  codes: codes,
       },
     },
   })
@@ -94,4 +94,4 @@ async function rip(bozo) {
   }
 }
 
-export { getAllMemberCodes, validateCodes, findMembersToKick, rip }
+export { getAllMemberCodes, validateCodes, sendInviteLink, findMembersToKick, rip }
