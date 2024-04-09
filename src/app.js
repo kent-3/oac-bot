@@ -24,8 +24,9 @@ const secretjs = new SecretNetworkClient({
 
 bot.telegram.setMyCommands([
   { command: 'start', description: 'Be greeted by the bot' },
-  { command: 'join', description: 'Request an invitation' },
   { command: 'code', description: 'Get your OAC code' },
+  { command: 'join', description: 'Request an invitation' },
+  { command: 'fact', description: 'Get a random fact about amber' },
   { command: 'stake', description: 'Get SCRT staked to AmberDAO' },
   {
     command: 'delegators',
@@ -35,7 +36,6 @@ bot.telegram.setMyCommands([
     command: 'top5whale',
     description: 'Get top 5 largest delegations to AmberDAO',
   },
-  { command: 'fact', description: 'Get a random fact about amber' },
 ])
 
 const keyboard = Markup.keyboard([
@@ -47,10 +47,12 @@ const keyboard = Markup.keyboard([
 
 bot.start((ctx) => {
   ctx.replyWithMarkdownV2(
-    `Enter your SCRT address and AMBER viewing key to generate an invite link to OAC\\.
+    `Enter your SCRT address and AMBER viewing key to get your OAC member code\\.
 
 Example:
-\`/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42\``,
+\`/code secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42\`
+
+\`/join xDgNdgvDiXnrh4O-QFHz3YwstYGCfxNuQ33AlJymlQg\``,
     keyboard
   )
 })
@@ -97,34 +99,6 @@ bot.command('code', async (ctx) => {
   }
 })
 
-bot.command('insert_user', async (ctx) => {
-  const id = ctx.from.id
-  const username = ctx.from.username
-  const code = ctx.message.text.split(' ')[1]
-
-  await addUser(db, { id, username, code })
-
-  ctx.reply('OK')
-})
-
-bot.command('get_users', async (ctx) => {
-  if (ctx.from.id != process.env.ADMIN_ID) {
-    return ctx.reply('Unauthorized')
-  }
-
-  const users = await getUsers(db)
-  const message =
-    users
-      .map(
-        (user) =>
-          `Username: ${user.username ? user.username : 'null'}\nCode: ${user.code
-          }\n`
-      )
-      .join('\n\n') + `\n\nTotal Users: ${users.length}`
-
-  ctx.reply(message)
-})
-
 bot.command('join', async (ctx) => {
   if (ctx.chat.id < 0) {
     return ctx.reply('DM me')
@@ -152,6 +126,34 @@ bot.command('join', async (ctx) => {
     console.error(error)
     return ctx.reply('Something went wrong...')
   }
+})
+
+bot.command('insert_user', async (ctx) => {
+  const id = ctx.from.id
+  const username = ctx.from.username
+  const code = ctx.message.text.split(' ')[1]
+
+  await addUser(db, { id, username, code })
+
+  ctx.reply('OK')
+})
+
+bot.command('get_users', async (ctx) => {
+  if (ctx.from.id != process.env.ADMIN_ID) {
+    return ctx.reply('Unauthorized')
+  }
+
+  const users = await getUsers(db)
+  const message =
+    users
+      .map(
+        (user) =>
+          `Username: ${user.username ? user.username : 'null'}\nCode: ${user.code
+          }\n`
+      )
+      .join('\n\n') + `\n\nTotal Users: ${users.length}`
+
+  ctx.reply(message)
 })
 
 bot.command('oac', async (ctx) => {
