@@ -3,20 +3,24 @@ import { SecretNetworkClient } from 'secretjs'
 import { Markup, Telegraf } from 'telegraf'
 import 'dotenv/config'
 import { initDb, addUser, getUsers } from './database.js'
+import {
+  getAllMemberCodes,
+  validateCodes,
+  findMembersToKick,
+  rip,
+} from './utils.js'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
 const PRIVATE_CHAT_ID = process.env.PRIVATE_CHAT_ID
 const LCD_URL = process.env.LCD_URL
 const CHAIN_ID = process.env.CHAIN_ID
 
+const db = await initDb()
+const bot = new Telegraf(BOT_TOKEN)
 const secretjs = new SecretNetworkClient({
   url: LCD_URL,
   chainId: CHAIN_ID,
 })
-
-const db = await initDb()
-
-const bot = new Telegraf(BOT_TOKEN)
 
 bot.telegram.setMyCommands([
   { command: 'start', description: 'Be greeted by the bot' },
@@ -54,7 +58,6 @@ Example:
 bot.command('code', async (ctx) => {
   const text = ctx.message.text
   const [_command, address, viewingKey] = text.split(' ')
-  let code
 
   if (ctx.chat.id < 0) {
     return ctx.reply('DM me')
@@ -79,17 +82,18 @@ bot.command('code', async (ctx) => {
       },
     })
     console.log(response)
-    code = response.member_code.code
+    const code = response.member_code.code
+
+    if (code === '') {
+      return ctx.reply('Not enough AMBER...')
+    } else {
+      return ctx.reply(`Your OAC membership code is: ${code}`)
+    }
   } catch (error) {
+    console.error(error)
     return ctx.reply(
       "I couldn't check your balance 😢. Check your address and viewing key, and try again."
     )
-  }
-
-  if (code === '') {
-    return ctx.reply('Not enough AMBER...')
-  } else {
-    return ctx.reply(`Your OAC membership code is: ${code}`)
   }
 })
 
@@ -103,54 +107,77 @@ bot.command('insert_user', async (ctx) => {
   ctx.reply('OK')
 })
 
+bot.command('get_users', async (ctx) => {
+  if (ctx.from.id != process.env.ADMIN_ID) {
+    return ctx.reply('Unauthorized')
+  }
+
+  const users = await getUsers(db)
+  const message =
+    users
+      .map(
+        (user) =>
+          `Username: ${user.username ? user.username : 'null'}\nCode: ${user.code
+          }\n`
+      )
+      .join('\n\n') + `\n\nTotal Users: ${users.length}`
+
+  ctx.reply(message)
+})
+
 bot.command('join', async (ctx) => {
   if (ctx.chat.id < 0) {
     return ctx.reply('DM me')
   }
-  const text = ctx.message.text
-  const [_command, address, viewingKey] = text.split(' ')
-  if (!address || !viewingKey) {
+
+  const id = ctx.from.id
+  const username = ctx.from.username
+  const code = ctx.message.text.split(' ')[1]
+
+  if (!code) {
     return ctx.reply(
-      'Please provide an address and viewing key. Like this: `/join secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852 9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42`'
+      'Please provide a code like this: `/code xDgNdgvDiXnrh4O-QFHz3YwstYGCfxNuQ33AlJymlQg`'
     )
   }
-  let amount = '0'
+
   try {
-    const response = await secretjs.query.snip20.getBalance({
-      contract: {
-        address: 'secret1s09x2xvfd2lp2skgzm29w2xtena7s8fq98v852',
-        code_hash:
-          '9a00ca4ad505e9be7e6e6dddf8d939b7ec7e9ac8e109c8681f10db9cacb36d42',
-      },
-      address: address,
-      auth: {
-        key: viewingKey,
-      },
-    })
-    console.log(response)
-    amount = response.balance.amount
-  } catch (error) {
-    return ctx.reply(
-      "I couldn't check your balance 😢. Check your address and viewing key, and try again."
-    )
-  }
-  if (parseInt(amount) < 1000000) {
-    ctx.reply('Not enough AMBER...')
-  } else if (parseInt(amount) >= 1000000) {
-    const userId = ctx.from.id
-    try {
-      const inviteLink = await ctx.telegram.exportChatInviteLink(
-        PRIVATE_CHAT_ID
-      )
-      await ctx.telegram.sendMessage(
-        userId,
-        `Your request has been approved. Join the chat using this link: ${inviteLink}`
-      )
-    } catch (error) {
-      console.log('Error generating invite link:', error)
+    const validCode = await validateCodes(secretjs, [code])
+    if (code === validCode) {
+      await addUser(db, { id, username, code })
+      await sendInviteLink(userId, PRIVATE_CHAT_ID)
+    } else {
+      return ctx.reply('Invalid code...')
     }
+  } catch (error) {
+    console.error(error)
+    return ctx.reply('Something went wrong...')
   }
 })
+
+bot.command('oac', async (ctx) => {
+  try {
+    const admins = await ctx.getChatAdministrators()
+    const isAdmin = admins.some((admin) => admin.user.id === ctx.from.id)
+
+    if (!isAdmin) {
+      return ctx.reply('Unauthorized')
+    }
+
+    const codes = await getAllMemberCodes(db)
+    const validCodes = await validateCodes(secretjs, codes)
+    const bozos = await findMembersToKick(db, validCodes)
+
+    for (const bozo of bozos) {
+      await rip(bozo)
+    }
+    return ctx.reply(`Kicked ${bozos.length}`)
+  } catch (error) {
+    console.error('Failed to get chat administrators:', error)
+    return ctx.reply('Error checking admin status.')
+  }
+})
+
+// Information Commands
 
 bot.command('stake', async (ctx) => {
   const { validator: response } = await secretjs.query.staking.validator({
@@ -209,8 +236,9 @@ bot.command('fact', (ctx) => {
   ctx.reply(fact)
 })
 
-bot.launch()
+// Bot Operation
 
+bot.launch()
 console.log('Bot is running...')
 
 process.once('SIGINT', async () => {
