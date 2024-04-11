@@ -42,11 +42,35 @@ bot.telegram.setMyCommands([
 const keyboard = Markup.keyboard([
   [
     Markup.button.webApp('amber.money', 'https://amber.money'),
-    Markup.button.webApp('App Preview', 'https://kent-3.github.io/amber-app'),
+    Markup.button.webApp('oneamber.club', 'https://oneamber.club'),
   ],
 ]).resize()
 
-bot.start((ctx) => {
+bot.start(async (ctx) => {
+  const code = ctx.payload
+  if (code) {
+    try {
+      const id = ctx.from.id
+      const username = ctx.from.username // ?? `${ctx.from.first_name}`
+      const validCode = await validateCodes(secretjs, [code])
+      if (code === validCode[0]) {
+        await addUser(db, { id, username, code })
+        const inviteLink = await ctx.telegram.exportChatInviteLink(
+          PRIVATE_CHAT_ID
+        )
+        return ctx.reply(
+          `Your request has been approved. Join the chat using this link: ${inviteLink}`,
+          keyboard
+        )
+      } else {
+        await ctx.reply('Invalid code...')
+      }
+    } catch (error) {
+      console.error(error)
+      await ctx.reply('Something went wrong...')
+    }
+  }
+
   ctx.replyWithMarkdownV2(
     `Enter your SCRT address and AMBER viewing key to get your OAC member code\\.
 
@@ -86,7 +110,7 @@ bot.command('code', async (ctx) => {
       },
     })
     console.log(response)
-    
+
     const code = response.member_code?.code
     const errorMessage = response.viewing_key_error?.msg
 
