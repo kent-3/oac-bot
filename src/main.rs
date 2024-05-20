@@ -154,33 +154,30 @@ async fn handle_inline_query(
     Ok(())
 }
 
-fn asset2article(asset: &TokenPrice) -> InlineQueryResult {
-    let price = format!(
-        "{} = {:.3} USD",
-        asset.name,
-        asset.value.parse::<f64>().unwrap_or_default()
-    );
+fn asset2article(asset: &MyToken) -> InlineQueryResult {
+    let price = format!("{} = {:.3} USD", asset.name, asset.price);
 
-    let price_24hr_change = asset.price_24hr_change.parse::<f64>().unwrap_or_default();
+    // let price_24hr_change = asset.price_24hr_change.parse::<f64>().unwrap_or_default();
 
     InlineQueryResult::Article(
-    InlineQueryResultArticle::new(
-                    &asset.id,
-                    &price,
-                    InputMessageContent::Text(InputMessageContentText::new(&price)),
-                )
-                .description(format!("24h    {:+.3}%", price_24hr_change))
-                .thumb_url(
-                    "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
-                        .parse()
-                        .unwrap(),
-                )
-                .url(
-                    "https://app.shadeprotocol.io/swap"
-                        .parse()
-                        .unwrap(),
-                )
-                )
+        InlineQueryResultArticle::new(
+            &asset.id,
+            &price,
+            InputMessageContent::Text(InputMessageContentText::new(&price)),
+        )
+        // .description(format!("24h    {:+.3}%", price_24hr_change))
+        .description(&asset.description)
+        .thumb_url(
+            // "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
+            asset
+                .logo_path
+                .as_deref()
+                .unwrap_or_default()
+                .parse()
+                .unwrap(),
+        )
+        .url("https://app.shadeprotocol.io/swap".parse().unwrap()),
+    )
 }
 
 fn ratio2article(token1: &str, token2: &str, ratio: f64) -> InlineQueryResult {
@@ -198,16 +195,16 @@ fn ratio2article(token1: &str, token2: &str, ratio: f64) -> InlineQueryResult {
     )
 }
 
-fn calculate_ratios(data: &[TokenPrice]) -> Result<(f64, f64)> {
+fn calculate_ratios(data: &[MyToken]) -> Result<(f64, f64)> {
     let mut shd = None;
     let mut scrt = None;
     let mut stkd_scrt = None;
 
     for item in data {
         match item.name.as_str() {
-            "SHD" => shd = Some(item.value.clone()),
-            "SCRT" => scrt = Some(item.value.clone()),
-            "stkd-SCRT" => stkd_scrt = Some(item.value.clone()),
+            "SHD" => shd = Some(item.price.clone()),
+            "SCRT" => scrt = Some(item.price.clone()),
+            "stkd-SCRT" => stkd_scrt = Some(item.price.clone()),
             _ => {}
         }
     }
@@ -216,12 +213,12 @@ fn calculate_ratios(data: &[TokenPrice]) -> Result<(f64, f64)> {
     let scrt = scrt.ok_or_eyre("SCRT not found")?;
     let stkd_scrt = stkd_scrt.ok_or_eyre("stkd-SCRT not found")?;
 
-    let shd_value = shd.parse::<f64>()?;
-    let scrt_value = scrt.parse::<f64>()?;
-    let stkd_scrt_value = stkd_scrt.parse::<f64>()?;
+    // let shd_value = shd.parse::<f64>()?;
+    // let scrt_value = scrt.parse::<f64>()?;
+    // let stkd_scrt_value = stkd_scrt.parse::<f64>()?;
 
-    let ratio1 = shd_value / scrt_value;
-    let ratio2 = shd_value / stkd_scrt_value;
+    let ratio1 = shd / scrt;
+    let ratio2 = shd / stkd_scrt;
 
     Ok((ratio1, ratio2))
 }

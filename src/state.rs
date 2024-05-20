@@ -1,9 +1,10 @@
+use color_eyre::eyre::{eyre, Error, OptionExt};
+use color_eyre::Report;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
-    error::Error,
     fs, io,
     path::Path,
     time::{Duration, Instant},
@@ -26,24 +27,90 @@ pub fn load_oac_members_from_file(file_path: &Path) -> io::Result<HashSet<UserId
     Ok(deserialized)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenPrice {
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GraphqlResponse<T> {
+    pub data: T,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Tokens {
+    pub tokens: Vec<Token>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Token {
     pub id: String,
     pub name: String,
-    pub value: String,
-    pub price_24hr_change: String,
+    pub code_hash: Option<String>,
+    pub contract_address: Option<String>,
+    pub denom: Option<String>,
+    pub flags: Vec<String>,
+    pub symbol: String,
+    pub description: String,
+    #[serde(rename = "Chain")]
+    pub chain: Chain,
+    #[serde(rename = "Asset")]
+    pub asset: Asset,
+    pub logo_path: Option<String>,
+    #[serde(rename = "PriceToken")]
+    pub price_token: Vec<PriceToken>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Chain {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Asset {
+    pub id: String,
+    pub decimals: u8,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PriceToken {
+    pub price_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+}
+
+// ---
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Prices {
+    pub prices: Vec<Price>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Price {
+    pub id: String,
+    pub value: Option<f64>,
+}
+
+// ---
+
+#[derive(Debug, Clone)]
+pub struct MyToken {
+    pub id: String,
+    pub name: String,
+    pub symbol: String,
+    pub description: String,
+    pub logo_path: Option<String>,
+    pub price: f64,
 }
 
 #[derive(Debug)]
 pub struct Cache {
     pub last_fetch_time: Instant,
-    pub data: Vec<TokenPrice>,
+    pub data: Vec<MyToken>,
 }
 
 impl Cache {
     pub fn new() -> Self {
         Cache {
-            data: Vec::<TokenPrice>::new(),
+            data: Vec::<MyToken>::new(),
             // set to a past time to trigger initial fetch
             last_fetch_time: Instant::now() - Duration::from_secs(5 * 60 + 1),
         }
@@ -53,45 +120,36 @@ impl Cache {
         self.last_fetch_time.elapsed() > Duration::from_secs(5 * 60)
     }
 
-    pub async fn fetch_and_cache_data(&mut self) -> Result<Vec<TokenPrice>, reqwest::Error> {
+    pub async fn fetch_and_cache_data(&mut self) -> Result<Vec<MyToken>, Report> {
         let now = Instant::now();
         let time_diff = now.duration_since(self.last_fetch_time).as_secs();
 
         if time_diff > 5 * 60 || self.data.is_empty() {
             debug!("Fetching and caching data...");
 
-            let response = reqwest::get(SHADE_API).await?;
+            let client = Client::new();
+            let tokens = get_tokens(&client, SHADE_API).await?;
+            let prices = get_prices(&client, SHADE_API).await?;
+            let data = process_tokens(tokens, prices);
 
-            if response.status().is_success() {
-                let mut data = response.json::<Vec<TokenPrice>>().await?;
-                process_data(&mut data);
-                self.data = data;
-                self.last_fetch_time = now;
-            } else {
-                error!("Request failed with status: {}", response.status());
-            }
+            self.data = data;
+            self.last_fetch_time = now;
         }
 
         Ok(self.data.clone())
     }
 
-    pub fn search(&self, name: &str) -> Vec<&TokenPrice> {
+    pub fn search(&self, name: &str) -> Vec<&MyToken> {
         let name = name.to_lowercase();
 
         self.data
             .iter()
-            .filter(|&item| {
-                item.name.to_lowercase().contains(name.trim()) && !item.name.ends_with("LP")
-            })
+            .filter(|&item| item.name.to_lowercase().contains(name.trim()))
             .collect()
     }
 }
 
-fn process_data(data: &mut [TokenPrice]) {
-    data.sort_unstable_by(|a, b| a.name.cmp(&b.name))
-}
-
-async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Box<dyn Error>> {
+async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Report> {
     let payload = json!({
         "operationName": "getTokens",
         "variables": {},
@@ -135,15 +193,11 @@ async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Box<dyn Er
         let data: GraphqlResponse<Tokens> = serde_json::from_str(&body)?;
         Ok(data.data.tokens)
     } else {
-        Err(Box::from(format!(
-            "Request failed with status: {}",
-            response.status()
-        )))
+        Err(eyre!("Request failed with status: {}", response.status()))
     }
 }
 
-async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Box<dyn Error>> {
-    let url = "https://prodv1.securesecrets.org/graphql";
+async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Report> {
     let payload = json!({
         "operationName": "getPrices",
         "variables": {
@@ -160,7 +214,6 @@ async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Box<dyn Er
         "#
     });
 
-    let client = Client::new();
     let response = client
         .post(url)
         .header("Content-Type", "application/json")
@@ -174,100 +227,40 @@ async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Box<dyn Er
         let data: GraphqlResponse<Prices> = serde_json::from_str(&body)?;
         Ok(data.data.prices)
     } else {
-        Err(Box::from(format!(
-            "Request failed with status: {}",
-            response.status()
-        )))
+        Err(eyre!("Request failed with status: {}", response.status()))
     }
 }
 
-// ---
-
-// #[derive(Debug, Deserialize, Serialize)]
-// struct TokenResponseData {
-//     data: Tokens,
-// }
-
-#[derive(Debug, Deserialize, Serialize)]
-struct GraphqlResponse<T> {
-    data: T,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Tokens {
-    tokens: Vec<Token>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Token {
-    id: String,
-    name: String,
-    code_hash: Option<String>,
-    contract_address: Option<String>,
-    denom: Option<String>,
-    flags: Vec<String>,
-    symbol: String,
-    description: String,
-    #[serde(rename = "Chain")]
-    chain: Chain,
-    #[serde(rename = "Asset")]
-    asset: Asset,
-    logo_path: Option<String>,
-    #[serde(rename = "PriceToken")]
-    price_token: Vec<PriceToken>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Chain {
-    id: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Asset {
-    id: String,
-    decimals: u8,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PriceToken {
-    price_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    value: Option<f64>,
-}
-
-// ---
-
-// #[derive(Debug, Deserialize, Serialize)]
-// struct PriceResponseData {
-//     data: Prices,
-// }
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Prices {
-    prices: Vec<Price>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Price {
-    id: String,
-    value: Option<f64>,
-}
-
-fn associate_prices(tokens: &mut [Token], prices: &[Price]) {
+fn process_tokens(tokens: Vec<Token>, prices: Vec<Price>) -> Vec<MyToken> {
     let price_map: HashMap<String, Option<f64>> = prices
-        .iter()
-        .map(|price| (price.id.clone(), price.value))
+        .into_iter()
+        .map(|price| (price.id, price.value))
         .collect();
 
-    for token in tokens {
-        for price_token in &mut token.price_token {
-            if let Some(price_value) = price_map.get(&price_token.price_id) {
-                price_token.value = *price_value;
-            }
-        }
-    }
+    let mut my_tokens: Vec<MyToken> = tokens
+        .into_iter()
+        .filter(|token| !token.name.contains("SHADESWAP Liquidity Provider (LP)"))
+        .filter_map(|mut token| {
+            let price = token.price_token.get_mut(0).and_then(|pt| {
+                pt.value = price_map.get(&pt.price_id).copied().flatten();
+                pt.value
+            });
+
+            price.map(|price| MyToken {
+                id: token.id,
+                name: token.name,
+                symbol: token.symbol,
+                description: token.description,
+                logo_path: token.logo_path,
+                price,
+            })
+        })
+        .collect();
+
+    // Sort the tokens alphabetically by name
+    my_tokens.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    my_tokens
 }
 
 #[cfg(test)]
@@ -275,12 +268,14 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn test_main() -> Result<(), Box<dyn Error>> {
+    async fn test_main() -> Result<(), Report> {
         let client = Client::new();
-        let mut tokens = get_tokens(&client, SHADE_API).await?;
+        let tokens = get_tokens(&client, SHADE_API).await?;
         let prices = get_prices(&client, SHADE_API).await?;
-        associate_prices(&mut tokens, &prices);
-        println!("Tokens with associated prices: {:#?}", tokens);
+        let data = process_tokens(tokens, prices);
+
+        println!("Tokens with associated prices: {:#?}", data);
+        println!("# of Tokens: {}", data.len());
         Ok(())
     }
 }
