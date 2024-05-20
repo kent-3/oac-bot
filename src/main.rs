@@ -123,8 +123,11 @@ async fn handle_inline_query(
 
     let mut cache = cache.lock().await;
 
-    if cache.needs_update() {
-        cache.fetch_and_cache_data().await?;
+    if cache.tokens_need_update() {
+        cache.fetch_and_cache_tokens().await?;
+    }
+    if cache.prices_need_update() {
+        cache.fetch_and_cache_prices().await?;
     }
 
     let results: Vec<InlineQueryResult> = match query {
@@ -154,8 +157,16 @@ async fn handle_inline_query(
     Ok(())
 }
 
-fn asset2article(asset: &MyToken) -> InlineQueryResult {
-    let price = format!("{} = {:.3} USD", asset.name, asset.price);
+fn asset2article(asset: &Token) -> InlineQueryResult {
+    let price = asset
+        .price_token
+        .iter()
+        .next()
+        .and_then(|pt| pt.value)
+        .map_or_else(
+            || "Price token or value is missing".to_string(),
+            |value| format!("{} = {:.3} USD", asset.name, value),
+        );
 
     // let price_24hr_change = asset.price_24hr_change.parse::<f64>().unwrap_or_default();
 
@@ -195,16 +206,22 @@ fn ratio2article(token1: &str, token2: &str, ratio: f64) -> InlineQueryResult {
     )
 }
 
-fn calculate_ratios(data: &[MyToken]) -> Result<(f64, f64)> {
+fn calculate_ratios(data: &[Token]) -> Result<(f64, f64)> {
     let mut shd = None;
     let mut scrt = None;
     let mut stkd_scrt = None;
 
     for item in data {
         match item.name.as_str() {
-            "SHD" => shd = Some(item.price.clone()),
-            "SCRT" => scrt = Some(item.price.clone()),
-            "stkd-SCRT" => stkd_scrt = Some(item.price.clone()),
+            "SHD" => {
+                shd = item.price_token.iter().next().and_then(|pt| pt.value);
+            }
+            "SCRT" => {
+                scrt = item.price_token.iter().next().and_then(|pt| pt.value);
+            }
+            "stkd-SCRT" => {
+                stkd_scrt = item.price_token.iter().next().and_then(|pt| pt.value);
+            }
             _ => {}
         }
     }

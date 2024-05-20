@@ -1,5 +1,4 @@
-use color_eyre::eyre::{eyre, Error, OptionExt};
-use color_eyre::Report;
+use color_eyre::eyre::{eyre, Error};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -42,16 +41,8 @@ pub struct Tokens {
 pub struct Token {
     pub id: String,
     pub name: String,
-    pub code_hash: Option<String>,
-    pub contract_address: Option<String>,
-    pub denom: Option<String>,
-    pub flags: Vec<String>,
     pub symbol: String,
     pub description: String,
-    #[serde(rename = "Chain")]
-    pub chain: Chain,
-    #[serde(rename = "Asset")]
-    pub asset: Asset,
     pub logo_path: Option<String>,
     #[serde(rename = "PriceToken")]
     pub price_token: Vec<PriceToken>,
@@ -72,7 +63,7 @@ pub struct Asset {
 #[serde(rename_all = "camelCase")]
 pub struct PriceToken {
     pub price_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
 }
 
@@ -91,55 +82,77 @@ pub struct Price {
 
 // ---
 
-#[derive(Debug, Clone)]
-pub struct MyToken {
-    pub id: String,
-    pub name: String,
-    pub symbol: String,
-    pub description: String,
-    pub logo_path: Option<String>,
-    pub price: f64,
-}
+// #[derive(Debug, Clone)]
+// pub struct MyToken {
+//     pub id: String,
+//     pub name: String,
+//     pub symbol: String,
+//     pub description: String,
+//     pub logo_path: Option<String>,
+//     pub price: f64,
+// }
 
 #[derive(Debug)]
 pub struct Cache {
-    pub last_fetch_time: Instant,
-    pub data: Vec<MyToken>,
+    pub data: Vec<Token>,
+    pub last_price_fetch_time: Instant,
+    pub last_token_fetch_time: Instant,
 }
 
 impl Cache {
     pub fn new() -> Self {
         Cache {
-            data: Vec::<MyToken>::new(),
+            data: Vec::<Token>::new(),
             // set to a past time to trigger initial fetch
-            last_fetch_time: Instant::now() - Duration::from_secs(5 * 60 + 1),
+            last_token_fetch_time: Instant::now() - Duration::from_secs(60 * 60 * 24 + 1),
+            last_price_fetch_time: Instant::now() - Duration::from_secs(5 * 60 + 1),
         }
     }
 
-    pub fn needs_update(&self) -> bool {
-        self.last_fetch_time.elapsed() > Duration::from_secs(5 * 60)
+    pub fn tokens_need_update(&self) -> bool {
+        self.last_token_fetch_time.elapsed() > Duration::from_secs(60 * 60 * 24)
     }
 
-    pub async fn fetch_and_cache_data(&mut self) -> Result<Vec<MyToken>, Report> {
-        let now = Instant::now();
-        let time_diff = now.duration_since(self.last_fetch_time).as_secs();
+    pub fn prices_need_update(&self) -> bool {
+        self.last_price_fetch_time.elapsed() > Duration::from_secs(5 * 60)
+    }
 
-        if time_diff > 5 * 60 || self.data.is_empty() {
-            debug!("Fetching and caching data...");
+    pub async fn fetch_and_cache_tokens(&mut self) -> Result<&mut Self, Error> {
+        let now = Instant::now();
+        let time_diff = now.duration_since(self.last_token_fetch_time).as_secs();
+
+        if time_diff > 60 * 60 * 24 || self.data.is_empty() {
+            debug!("Fetching and caching tokens...");
 
             let client = Client::new();
-            let tokens = get_tokens(&client, SHADE_API).await?;
-            let prices = get_prices(&client, SHADE_API).await?;
-            let data = process_tokens(tokens, prices);
+            let mut tokens = get_tokens(&client, SHADE_API).await?;
+            filter_and_sort_tokens(&mut tokens);
 
-            self.data = data;
-            self.last_fetch_time = now;
+            self.last_token_fetch_time = now;
+            self.data = tokens;
+        }
+
+        Ok(self)
+    }
+
+    pub async fn fetch_and_cache_prices(&mut self) -> Result<Vec<Token>, Error> {
+        let now = Instant::now();
+        let time_diff = now.duration_since(self.last_price_fetch_time).as_secs();
+
+        if time_diff > 5 * 60 || self.data.is_empty() {
+            debug!("Fetching and caching prices...");
+
+            let client = Client::new();
+            let prices = get_prices(&client, SHADE_API).await?;
+            update_prices(&mut self.data, prices);
+
+            self.last_price_fetch_time = now;
         }
 
         Ok(self.data.clone())
     }
 
-    pub fn search(&self, name: &str) -> Vec<&MyToken> {
+    pub fn search(&self, name: &str) -> Vec<&Token> {
         let name = name.to_lowercase();
 
         self.data
@@ -149,7 +162,7 @@ impl Cache {
     }
 }
 
-async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Report> {
+async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Error> {
     let payload = json!({
         "operationName": "getTokens",
         "variables": {},
@@ -158,19 +171,8 @@ async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Report> {
                     tokens {
                         id
                         name
-                        codeHash
-                        contractAddress
-                        denom
-                        flags
                         symbol
                         description
-                        Chain {
-                            id
-                        }
-                        Asset {
-                            id
-                            decimals
-                        }
                         logoPath
                         PriceToken {
                             priceId
@@ -197,7 +199,7 @@ async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Report> {
     }
 }
 
-async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Report> {
+async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Error> {
     let payload = json!({
         "operationName": "getPrices",
         "variables": {
@@ -231,36 +233,29 @@ async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Report> {
     }
 }
 
-fn process_tokens(tokens: Vec<Token>, prices: Vec<Price>) -> Vec<MyToken> {
+fn filter_and_sort_tokens(tokens: &mut Vec<Token>) {
+    // Filter out LP tokens and tokens with no price
+    tokens.retain(|token| {
+        !token.name.contains("SHADESWAP Liquidity Provider (LP)") && !token.price_token.is_empty()
+    });
+
+    // Sort the tokens alphabetically by name
+    tokens.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+}
+
+fn update_prices(tokens: &mut Vec<Token>, prices: Vec<Price>) {
     let price_map: HashMap<String, Option<f64>> = prices
         .into_iter()
         .map(|price| (price.id, price.value))
         .collect();
 
-    let mut my_tokens: Vec<MyToken> = tokens
-        .into_iter()
-        .filter(|token| !token.name.contains("SHADESWAP Liquidity Provider (LP)"))
-        .filter_map(|mut token| {
-            let price = token.price_token.get_mut(0).and_then(|pt| {
-                pt.value = price_map.get(&pt.price_id).copied().flatten();
-                pt.value
-            });
-
-            price.map(|price| MyToken {
-                id: token.id,
-                name: token.name,
-                symbol: token.symbol,
-                description: token.description,
-                logo_path: token.logo_path,
-                price,
-            })
-        })
-        .collect();
-
-    // Sort the tokens alphabetically by name
-    my_tokens.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-
-    my_tokens
+    for token in tokens {
+        for price_token in &mut token.price_token {
+            if let Some(price_value) = price_map.get(&price_token.price_id) {
+                price_token.value = *price_value;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -268,14 +263,16 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn test_main() -> Result<(), Report> {
+    async fn test_main() -> Result<(), Error> {
         let client = Client::new();
-        let tokens = get_tokens(&client, SHADE_API).await?;
-        let prices = get_prices(&client, SHADE_API).await?;
-        let data = process_tokens(tokens, prices);
+        let mut tokens = get_tokens(&client, SHADE_API).await?;
+        filter_and_sort_tokens(&mut tokens);
 
-        println!("Tokens with associated prices: {:#?}", data);
-        println!("# of Tokens: {}", data.len());
+        let prices = get_prices(&client, SHADE_API).await?;
+        update_prices(&mut tokens, prices);
+
+        println!("Tokens with associated prices: {:#?}", tokens);
+        println!("# of Tokens: {}", tokens.len());
         Ok(())
     }
 }
