@@ -2,6 +2,7 @@ use crate::state::save_oac_members_to_file;
 
 use std::{collections::HashSet, env, sync::Arc};
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 
 use teloxide::{prelude::*, utils::command::BotCommands};
 
@@ -21,7 +22,7 @@ pub async fn start(
     oac_members: Arc<RwLock<HashSet<UserId>>>,
     msg: Message,
 ) -> HandlerResult {
-    log::debug!("handling /start command");
+    debug!("handling /start command");
 
     let mut oac_members = oac_members.write().await;
 
@@ -35,14 +36,14 @@ pub async fn start(
         // TODO - this has to be very inefficient to do every single time
         save_oac_members_to_file(&oac_members, &file_path)?;
 
-        log::debug!("added {:#?} to oac_members", user.id);
+        debug!("added {:#?} to oac_members", user.id);
     }
 
     Ok(())
 }
 
 pub async fn help(bot: Bot, msg: Message) -> HandlerResult {
-    log::debug!("handling /help command");
+    debug!("handling /help command");
 
     bot.send_message(msg.chat.id, Command::descriptions().to_string())
         .await?;

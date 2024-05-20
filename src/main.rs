@@ -18,6 +18,7 @@ use teloxide::{
     utils::command::BotCommands,
     Bot, RequestError,
 };
+use tracing::{debug, error, info, warn};
 
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
@@ -25,11 +26,11 @@ type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 async fn main() -> Result<()> {
     color_eyre::install()?;
     pretty_env_logger::init();
-    log::info!("Starting bot...");
+    info!("Starting bot...");
 
     let file_path = env::current_dir()?.join("members.json");
     let oac_members: HashSet<UserId> = load_oac_members_from_file(&file_path).unwrap_or_default();
-    log::debug!("OAC members: {:#?}", &oac_members);
+    debug!("OAC members: {:#?}", &oac_members);
 
     let cache = Arc::new(Mutex::new(Cache::new()));
     let oac_members = Arc::new(RwLock::new(oac_members));
@@ -67,10 +68,10 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 }
 
 async fn handle_message(bot: Bot, msg: Message) -> HandlerResult {
-    log::debug!("handling message");
+    debug!("handling message");
 
     if let Some(user) = msg.from() {
-        log::info!("Received message from user ID: {}", user.id);
+        info!("Received message from user ID: {}", user.id);
         bot.send_message(msg.chat.id, "I heard that").await?;
     }
 
@@ -86,7 +87,7 @@ async fn handle_inline_query(
     let query = q.query.trim();
 
     if query.is_empty() {
-        log::debug!("Empty query");
+        debug!("Empty query");
         bot.answer_inline_query(&q.id, vec![]).send().await?;
         return Ok(());
     }
@@ -115,7 +116,7 @@ async fn handle_inline_query(
             .send()
             .await;
         if let Err(err) = response {
-            log::error!("Error in handler: {:?}", err);
+            error!("Error in handler: {:?}", err);
         };
         return Ok(());
     }
@@ -147,7 +148,7 @@ async fn handle_inline_query(
         .await;
 
     if let Err(err) = response {
-        log::error!("Error in inline query handler: {:?}", err);
+        error!("Error in inline query handler: {:?}", err);
     };
 
     Ok(())
