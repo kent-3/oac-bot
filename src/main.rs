@@ -177,17 +177,16 @@ fn asset2article(asset: &Token) -> InlineQueryResult {
             InputMessageContent::Text(InputMessageContentText::new(&price)),
         )
         // .description(format!("24h    {:+.3}%", price_24hr_change))
-        .description(&asset.description)
-        .thumb_url(
-            // "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
-            asset
-                .logo_path
-                .as_deref()
-                .unwrap_or_default()
-                .parse()
-                .unwrap(),
-        )
-        .url("https://app.shadeprotocol.io/swap".parse().unwrap()),
+        .description(&asset.description), // .thumb_url(
+                                          // "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
+                                          // asset
+                                          //     .logo_path
+                                          //     .as_deref()
+                                          //     .unwrap_or_default()
+                                          // .parse()
+                                          // .unwrap(),
+                                          // )
+                                          // .url("https://app.shadeprotocol.io/swap".parse().unwrap()),
     )
 }
 
