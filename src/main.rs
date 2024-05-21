@@ -36,6 +36,7 @@ async fn main() -> Result<()> {
 
     let file_path = env::current_dir()?.join("members.json");
     let oac_members: HashSet<UserId> = load_oac_members_from_file(&file_path).unwrap_or_default();
+    info!("Member count: {}", &oac_members.len());
     debug!("OAC members: {:#?}", &oac_members);
 
     let cache = Arc::new(Mutex::new(Cache::new()));
