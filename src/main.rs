@@ -142,7 +142,7 @@ async fn handle_inline_query(
                 .map_err(|err| RequestError::from(std::io::Error::other(err.to_string())))?;
 
             let article1 = ratio2article("SHD", "SCRT", shd_scrt);
-            let article2 = ratio2article("SHD", "stkd-SCRT", shd_stkd_scrt);
+            let article2 = ratio2article("SHD", "stkdSCRT", shd_stkd_scrt);
 
             vec![article1, article2]
         }
@@ -224,7 +224,7 @@ fn calculate_ratios(data: &[Token]) -> Result<(f64, f64)> {
             "SCRT" => {
                 scrt = token.price_token.iter().next().and_then(|pt| pt.value);
             }
-            "stkd-SCRT" => {
+            "stkdSCRT" => {
                 stkd_scrt = token.price_token.iter().next().and_then(|pt| pt.value);
             }
             _ => {}
@@ -233,7 +233,7 @@ fn calculate_ratios(data: &[Token]) -> Result<(f64, f64)> {
 
     let shd = shd.ok_or_eyre("SHD not found")?;
     let scrt = scrt.ok_or_eyre("SCRT not found")?;
-    let stkd_scrt = stkd_scrt.ok_or_eyre("stkd-SCRT not found")?;
+    let stkd_scrt = stkd_scrt.ok_or_eyre("stkdSCRT not found")?;
 
     // let shd_value = shd.parse::<f64>()?;
     // let scrt_value = scrt.parse::<f64>()?;
