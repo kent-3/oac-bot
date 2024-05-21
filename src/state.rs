@@ -98,7 +98,7 @@ impl Cache {
         let time_diff = now.duration_since(self.last_token_fetch_time).as_secs();
 
         if time_diff > 60 * 60 * 24 || self.data.is_empty() {
-            debug!("Fetching and caching tokens...");
+            info!("Fetching and caching tokens...");
 
             let client = Client::new();
             let mut tokens = get_tokens(&client, SHADE_API).await?;
@@ -116,7 +116,7 @@ impl Cache {
         let time_diff = now.duration_since(self.last_price_fetch_time).as_secs();
 
         if time_diff > 5 * 60 || self.data.is_empty() {
-            debug!("Fetching and caching prices...");
+            info!("Fetching and caching prices...");
 
             let client = Client::new();
             let prices = get_prices(&client, SHADE_API).await?;

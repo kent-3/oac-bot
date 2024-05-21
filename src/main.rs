@@ -74,8 +74,6 @@ fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>>
 }
 
 async fn handle_message(bot: Bot, msg: Message) -> HandlerResult {
-    debug!("handling message");
-
     if let Some(user) = msg.from() {
         info!("Received message from user ID: {}", user.id);
         bot.send_message(msg.chat.id, "I heard that").await?;
@@ -198,16 +196,16 @@ fn asset2article(asset: &Token) -> InlineQueryResult {
 
 fn ratio2article(token1: &str, token2: &str, ratio: f64) -> InlineQueryResult {
     let text = format!("1 {} = {:.2} {}", token1, ratio, token2);
-    InlineQueryResult::Article(InlineQueryResultArticle::new(
-        Uuid::new_v4(),
-        &text,
-        InputMessageContent::Text(InputMessageContentText::new(&text)),
-    )
-        .thumb_url(
-            "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
-                .parse()
-                .unwrap(),
-            )
+    InlineQueryResult::Article(
+        InlineQueryResultArticle::new(
+            Uuid::new_v4(),
+            &text,
+            InputMessageContent::Text(InputMessageContentText::new(&text)),
+        ), // .thumb_url(
+           //     "https://raw.githubusercontent.com/cosmos/chain-registry/master/secretnetwork/images/shd.png"
+           //         .parse()
+           //         .unwrap(),
+           //     )
     )
 }
 
