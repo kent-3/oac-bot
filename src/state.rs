@@ -1,6 +1,6 @@
 use color_eyre::eyre::{eyre, Error};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
@@ -26,17 +26,17 @@ pub fn load_oac_members_from_file(file_path: &Path) -> io::Result<HashSet<UserId
     Ok(deserialized)
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct GraphqlResponse<T> {
     pub data: T,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct Tokens {
     pub tokens: Vec<Token>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Token {
     pub id: String,
@@ -48,49 +48,25 @@ pub struct Token {
     pub price_token: Vec<PriceToken>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Chain {
-    pub id: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Asset {
-    pub id: String,
-    pub decimals: u8,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PriceToken {
     pub price_id: String,
-    // #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
 }
 
-// ---
-
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct Prices {
     pub prices: Vec<Price>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Price {
     pub id: String,
     pub value: Option<f64>,
 }
 
 // ---
-
-// #[derive(Debug, Clone)]
-// pub struct MyToken {
-//     pub id: String,
-//     pub name: String,
-//     pub symbol: String,
-//     pub description: String,
-//     pub logo_path: Option<String>,
-//     pub price: f64,
-// }
 
 #[derive(Debug)]
 pub struct Cache {
@@ -128,14 +104,14 @@ impl Cache {
             let mut tokens = get_tokens(&client, SHADE_API).await?;
             filter_and_sort_tokens(&mut tokens);
 
-            self.last_token_fetch_time = now;
             self.data = tokens;
+            self.last_token_fetch_time = now;
         }
 
         Ok(self)
     }
 
-    pub async fn fetch_and_cache_prices(&mut self) -> Result<Vec<Token>, Error> {
+    pub async fn fetch_and_cache_prices(&mut self) -> Result<&mut Self, Error> {
         let now = Instant::now();
         let time_diff = now.duration_since(self.last_price_fetch_time).as_secs();
 
@@ -149,7 +125,7 @@ impl Cache {
             self.last_price_fetch_time = now;
         }
 
-        Ok(self.data.clone())
+        Ok(self)
     }
 
     pub fn search(&self, name: &str) -> Vec<&Token> {
@@ -187,8 +163,7 @@ async fn get_tokens(client: &Client, url: &str) -> Result<Vec<Token>, Error> {
         .header("Content-Type", "application/json")
         .json(&payload)
         .send()
-        .await
-        .unwrap();
+        .await?;
 
     if response.status().is_success() {
         let body = response.text().await?;
@@ -221,8 +196,7 @@ async fn get_prices(client: &Client, url: &str) -> Result<Vec<Price>, Error> {
         .header("Content-Type", "application/json")
         .json(&payload)
         .send()
-        .await
-        .unwrap();
+        .await?;
 
     if response.status().is_success() {
         let body = response.text().await?;
