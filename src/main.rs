@@ -24,8 +24,14 @@ type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    color_eyre::install()?;
-    pretty_env_logger::init();
+    ::color_eyre::install()?;
+    ::tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_line_number(false)
+        .with_file(false)
+        // .without_time()
+        // .pretty()
+        .init();
     info!("Starting bot...");
 
     let file_path = env::current_dir()?.join("members.json");
