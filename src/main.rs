@@ -171,7 +171,7 @@ fn asset2article(asset: &Token) -> InlineQueryResult {
         .and_then(|pt| pt.value)
         .map_or_else(
             || "Price token or value is missing".to_string(),
-            |value| format!("{} = {:.3} USD", asset.symbol, value),
+            |value| format!("{} = {} USD", asset.symbol, value),
         );
 
     // let price_24hr_change = asset.price_24hr_change.parse::<f64>().unwrap_or_default();
