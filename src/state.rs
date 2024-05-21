@@ -128,12 +128,12 @@ impl Cache {
         Ok(self)
     }
 
-    pub fn search(&self, name: &str) -> Vec<&Token> {
-        let name = name.to_lowercase();
+    pub fn search(&self, symbol: &str) -> Vec<&Token> {
+        let symbol = symbol.to_lowercase();
 
         self.data
             .iter()
-            .filter(|&item| item.name.to_lowercase().contains(name.trim()))
+            .filter(|&item| item.symbol.to_lowercase().contains(symbol.trim()))
             .collect()
     }
 }
