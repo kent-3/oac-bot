@@ -210,16 +210,16 @@ fn calculate_ratios(data: &[Token]) -> Result<(f64, f64)> {
     let mut scrt = None;
     let mut stkd_scrt = None;
 
-    for item in data {
-        match item.name.as_str() {
+    for token in data {
+        match token.symbol.as_str() {
             "SHD" => {
-                shd = item.price_token.iter().next().and_then(|pt| pt.value);
+                shd = token.price_token.iter().next().and_then(|pt| pt.value);
             }
             "SCRT" => {
-                scrt = item.price_token.iter().next().and_then(|pt| pt.value);
+                scrt = token.price_token.iter().next().and_then(|pt| pt.value);
             }
             "stkd-SCRT" => {
-                stkd_scrt = item.price_token.iter().next().and_then(|pt| pt.value);
+                stkd_scrt = token.price_token.iter().next().and_then(|pt| pt.value);
             }
             _ => {}
         }
