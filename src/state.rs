@@ -42,7 +42,7 @@ pub struct Token {
     pub id: String,
     pub name: String,
     pub symbol: String,
-    pub description: String,
+    pub description: Option<String>,
     pub logo_path: Option<String>,
     #[serde(rename = "PriceToken")]
     pub price_token: Vec<PriceToken>,
